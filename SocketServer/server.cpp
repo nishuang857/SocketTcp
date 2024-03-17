@@ -3,8 +3,44 @@
 #include<WinSock2.h>//包含Socket的头文件
 #include<windows.h>//包含windows的头文件
 #pragma comment(lib,"ws2_32.lib")//加入静态链接库
-//用Socket API建立简易TCP服务端
 
+//发送的网络消息数据结构化
+//struct DataPackage {
+//	int age;
+//	char name[32];
+//};
+
+//网络报文数据格式结构
+enum CMD
+{
+	CMD_LOGIN,
+	CMD_LOGOUT,
+	CMD_ERROR
+};
+//包头 描述消息包的大小，描述数据的作用
+struct DataHeader {
+	short _dataLength;
+	short _cmd;
+};
+//包体 存放数据
+struct Login {
+	char _userName[32];
+	char _password[32];
+};
+struct LoginResult {
+	int _result;
+};
+struct Logout
+{
+	char _userName[32];
+};
+struct LogoutResult
+{
+	int _result;
+};
+
+
+//用Socket API建立简易TCP服务端
 int main() {
 	//启动Windows socket 2.x环境
 	WORD ver = MAKEWORD(2, 2);
@@ -48,26 +84,36 @@ int main() {
 	}
 
 	// 5 接收请求
-	char recvBuf[128] = {};//接收数据缓冲区
 	while (true) {
-		int nLen = recv(cSock, recvBuf, 128, 0);
+		DataHeader header = {};//接收数据放到数据头
+		int nLen = recv(cSock, (char*)&header, sizeof(DataHeader), 0);
 		if (nLen <= 0) {
 			std::cout << "客户端已退出，任务结束" << std::endl;
 			break;
 		}
-		std::cout << "收到客户端命令：" << recvBuf << std::endl;
+		std::cout << "收到客户端命令：" << header._cmd <<" 数据长度："<<header._dataLength << std::endl;
 		// 6 向客户端发送响应 
-		if (strcmp(recvBuf, "getname") == 0) {
-			char msgBuf[] = "Ni shuang";
-			send(cSock, msgBuf, strlen(msgBuf) + 1, 0);
-		}
-		else if (strcmp(recvBuf, "getage") == 0) {
-			char msgBuf[] = "24";
-			send(cSock, msgBuf, strlen(msgBuf) + 1, 0);
-		}
-		else {
-			char msgBuf[] = "???";
-			send(cSock, msgBuf, strlen(msgBuf) + 1, 0);
+		switch (header._cmd)
+		{
+		case CMD_LOGIN: {
+			Login login = {};
+			recv(cSock, (char*)&login, sizeof(login), 0);
+			LoginResult ret = { 1 };
+			send(cSock, (char*)&header, sizeof(DataHeader), 0);
+			send(cSock, (char*)&ret, sizeof(LoginResult), 0);
+		}break;
+		case CMD_LOGOUT: {
+			Logout logout = {};
+			recv(cSock, (char*)&logout, sizeof(Logout), 0);
+			LogoutResult ret = { 1 };
+			send(cSock, (char*)&header, sizeof(DataHeader), 0);
+			send(cSock, (char*)&ret, sizeof(LogoutResult), 0);
+		}break;
+		default:
+			header._cmd = CMD_ERROR;
+			header._dataLength = 0;
+			send(cSock, (char*)&header, sizeof(DataHeader), 0);
+			break;
 		}
 	}
   

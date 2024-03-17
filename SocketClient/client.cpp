@@ -4,6 +4,40 @@
 #include<windows.h>//包含windows的头文件
 #pragma comment(lib,"ws2_32.lib")//加入静态链接库
 
+//发送的网络消息数据结构化
+//struct DataPackage {
+//	int age;
+//	char name[32];
+//};
+//网络报文数据格式结构
+enum CMD
+{
+	CMD_LOGIN,
+	CMD_LOGOUT,
+	CMD_ERROR
+};
+//包头 描述消息包的大小，描述数据的作用
+struct DataHeader {
+	short _dataLength;
+	short _cmd;
+};
+//包体 存放数据
+struct Login {
+	char _userName[32];
+	char _password[32];
+};
+struct LoginResult {
+	int _result;
+};
+struct Logout
+{
+	char _userName[32];
+};
+struct LogoutResult
+{
+	int _result;
+};
+
 
 int main()
 {
@@ -34,7 +68,7 @@ int main()
 	}
 	
 	while (true) {
-		//4 发送请求
+
 		//输入请求
 		char cmdBuf[128] = {};
 		std::cin >> cmdBuf;
@@ -42,17 +76,36 @@ int main()
 			std::cout << "收到退出命令" << std::endl;
 			break;
 		}
+		else if (strcmp(cmdBuf, "login") == 0) {
+			Login login = { "ns","ns123" };
+			DataHeader dh = { sizeof(login),CMD_LOGIN };
+			//向服务器发送请求
+			send(sockfd, (const char*)&dh, sizeof(DataHeader), 0);
+			send(sockfd, (const char*)&login, sizeof(Login), 0);
+			//接收服务器返回的数据
+			DataHeader retHeader = {};
+			LoginResult retLogin = {};
+			recv(sockfd, (char*)&retHeader, sizeof(DataHeader), 0);
+			recv(sockfd, (char*)&retLogin, sizeof(LoginResult), 0);
+			std::cout << "LoginResult: " << retLogin._result << std::endl;
+		}
+		else if (strcmp(cmdBuf, "logout") == 0) {
+			Logout logout = { "ns" };
+			DataHeader dh = { sizeof(logout),CMD_LOGOUT };
+			//向服务器发送请求
+			send(sockfd, (const char*)&dh, sizeof(DataHeader), 0);
+			send(sockfd, (const char*)&logout, sizeof(Logout), 0);
+			//接收服务器返回的数据
+			DataHeader retHeader = {};
+			LogoutResult retLogout = {};
+			recv(sockfd, (char*)&retHeader, sizeof(DataHeader), 0);
+			recv(sockfd, (char*)&retLogout, sizeof(LogoutResult), 0);
+			std::cout << "LoginResult: " << retLogout._result << std::endl;
+
+		}
 		else {
-			send(sockfd, cmdBuf, strlen(cmdBuf) + 1, 0);
+			std::cout << "不支持命令，请求结束" << std::endl;
 		}
-
-		//5 接收响应
-		char recvBuf[128] = {};
-		int nLen = recv(sockfd, recvBuf, 128, 0);
-		if (nLen > 0) {
-			std::cout << "接收到数据：" << recvBuf << std::endl;
-		}
-
 	}
 	//6 关闭套接字
 	closesocket(sockfd);
