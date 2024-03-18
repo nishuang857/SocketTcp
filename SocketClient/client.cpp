@@ -16,6 +16,7 @@ enum CMD
 	CMD_LOGIN_RESULT,
 	CMD_LOGOUT,
 	CMD_LOGOUT_RESULT,
+	CMD_NEW_USER_JOIN,
 	CMD_ERROR
 };
 //包头 描述消息包的大小，描述数据的作用
@@ -59,6 +60,50 @@ struct LogoutResult :public DataHeader
 	}
 	int _result;
 };
+struct NewUserJoin :public DataHeader
+{
+	NewUserJoin() {
+		_dataLength = sizeof(NewUserJoin);
+		_cmd = CMD_NEW_USER_JOIN;
+		sock = 1;
+	}
+	int sock;
+};
+
+//处理服务器发送的请求函数
+int processor(SOCKET cSock) {
+	//接收数据缓冲区
+	char szRecv[1024] = {};
+	int nLen = recv(cSock, (char*)&szRecv, sizeof(DataHeader), 0);
+	//再放到数据头
+	DataHeader* header = (DataHeader*)szRecv;
+	if (nLen <= 0) {
+		std::cout << "与服务端断开连接" << std::endl;
+		return -1;
+	}
+
+	switch (header->_cmd)
+	{
+	case CMD_LOGIN_RESULT: {
+		recv(cSock, szRecv + sizeof(DataHeader), header->_dataLength - sizeof(DataHeader), 0);
+		LoginResult *ret=(LoginResult*)szRecv;
+		std::cout << "收到服务端消息：CMD_LOGIN_RESULT，数据长度：" << ret->_dataLength << std::endl;
+
+	}break;
+	case CMD_LOGOUT_RESULT: {
+		recv(cSock, szRecv + sizeof(DataHeader), header->_dataLength - sizeof(DataHeader), 0);
+		LogoutResult* ret = (LogoutResult*)szRecv;
+		std::cout << "收到服务端消息：CMD_LOGOUT_RESULT，数据长度：" << ret->_dataLength << std::endl;
+
+	}break;
+	case CMD_NEW_USER_JOIN: {
+		recv(cSock, szRecv + sizeof(DataHeader), header->_dataLength - sizeof(DataHeader), 0);
+		NewUserJoin* ret = (NewUserJoin*)szRecv;
+		std::cout << "收到服务端消息：CMD_NEW_USER_JOIN，数据长度：" << ret->_dataLength << std::endl;
+	}break;
+	}
+}
+
 
 
 int main()
@@ -91,39 +136,34 @@ int main()
 	
 	while (true) {
 
-		//输入请求
-		char cmdBuf[128] = {};
-		std::cin >> cmdBuf;
-		if (strcmp(cmdBuf, "exit") == 0) {
-			std::cout << "收到退出命令" << std::endl;
+		fd_set fdReads;
+		FD_ZERO(&fdReads);
+		FD_SET(sockfd, &fdReads);
+		timeval t = { 1,0 };
+		int ret = select(sockfd, &fdReads, 0, 0, &t);
+		if (ret < 0) {
+			std::cout << "select任务结束1" << std::endl;
 			break;
 		}
-		else if (strcmp(cmdBuf, "login") == 0) {
-			Login login;
-			strcpy(login._userName, "nishuang");
-			strcpy(login._password, "nishuang123");
-
-			//向服务器发送请求
-			send(sockfd, (const char*)&login, sizeof(Login), 0);
-			//接收服务器返回的数据
-			LoginResult retLogin = {};
-			recv(sockfd, (char*)&retLogin, sizeof(LoginResult), 0);
-			std::cout << "LoginResult: " << retLogin._result << std::endl;
-		}
-		else if (strcmp(cmdBuf, "logout") == 0) {
-			Logout logout;
-			strcpy(logout._userName, "nishuang");
-			//向服务器发送请求
-			send(sockfd, (const char*)&logout, sizeof(Logout), 0);
-			//接收服务器返回的数据
-			LogoutResult retLogout = {};
-			recv(sockfd, (char*)&retLogout, sizeof(LogoutResult), 0);
-			std::cout << "LoginResult: " << retLogout._result << std::endl;
+		if (FD_ISSET(sockfd, &fdReads)) {
+			FD_CLR(sockfd, &fdReads);
+			//调用处理函数
+			if (processor(sockfd) == -1) {
+				std::cout << "select任务结束2" << std::endl;
+				break;
+			}
 
 		}
-		else {
-			std::cout << "不支持命令，请求结束" << std::endl;
-		}
+
+		//空闲时间处理其他业务
+
+		Login login;
+		strcpy(login._userName, "Nishuang");
+		strcpy(login._password, "nishuang123");
+		send(sockfd, (const char*)&login, sizeof(login), 0);
+
+
+
 	}
 	//6 关闭套接字
 	closesocket(sockfd);
