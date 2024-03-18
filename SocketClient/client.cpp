@@ -13,7 +13,9 @@
 enum CMD
 {
 	CMD_LOGIN,
+	CMD_LOGIN_RESULT,
 	CMD_LOGOUT,
+	CMD_LOGOUT_RESULT,
 	CMD_ERROR
 };
 //包头 描述消息包的大小，描述数据的作用
@@ -22,19 +24,39 @@ struct DataHeader {
 	short _cmd;
 };
 //包体 存放数据
-struct Login {
+struct Login :public DataHeader
+{
+	Login() {
+		_dataLength = sizeof(Login);
+		_cmd = CMD_LOGIN;
+	}
 	char _userName[32];
 	char _password[32];
 };
-struct LoginResult {
+struct LoginResult :public DataHeader
+{
+	LoginResult() {
+		_dataLength = sizeof(LoginResult);
+		_cmd = CMD_LOGIN_RESULT;
+		_result = 1;
+	}
 	int _result;
 };
-struct Logout
+struct Logout :public DataHeader
 {
+	Logout() {
+		_dataLength = sizeof(Logout);
+		_cmd = CMD_LOGOUT;
+	}
 	char _userName[32];
 };
-struct LogoutResult
+struct LogoutResult :public DataHeader
 {
+	LogoutResult() {
+		_dataLength = sizeof(LogoutResult);
+		_cmd = CMD_LOGOUT_RESULT;
+		_result = 1;
+	}
 	int _result;
 };
 
@@ -77,28 +99,24 @@ int main()
 			break;
 		}
 		else if (strcmp(cmdBuf, "login") == 0) {
-			Login login = { "ns","ns123" };
-			DataHeader dh = { sizeof(login),CMD_LOGIN };
+			Login login;
+			strcpy(login._userName, "nishuang");
+			strcpy(login._password, "nishuang123");
+
 			//向服务器发送请求
-			send(sockfd, (const char*)&dh, sizeof(DataHeader), 0);
 			send(sockfd, (const char*)&login, sizeof(Login), 0);
 			//接收服务器返回的数据
-			DataHeader retHeader = {};
 			LoginResult retLogin = {};
-			recv(sockfd, (char*)&retHeader, sizeof(DataHeader), 0);
 			recv(sockfd, (char*)&retLogin, sizeof(LoginResult), 0);
 			std::cout << "LoginResult: " << retLogin._result << std::endl;
 		}
 		else if (strcmp(cmdBuf, "logout") == 0) {
-			Logout logout = { "ns" };
-			DataHeader dh = { sizeof(logout),CMD_LOGOUT };
+			Logout logout;
+			strcpy(logout._userName, "nishuang");
 			//向服务器发送请求
-			send(sockfd, (const char*)&dh, sizeof(DataHeader), 0);
 			send(sockfd, (const char*)&logout, sizeof(Logout), 0);
 			//接收服务器返回的数据
-			DataHeader retHeader = {};
 			LogoutResult retLogout = {};
-			recv(sockfd, (char*)&retHeader, sizeof(DataHeader), 0);
 			recv(sockfd, (char*)&retLogout, sizeof(LogoutResult), 0);
 			std::cout << "LoginResult: " << retLogout._result << std::endl;
 

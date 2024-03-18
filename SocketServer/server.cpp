@@ -14,7 +14,9 @@
 enum CMD
 {
 	CMD_LOGIN,
+	CMD_LOGIN_RESULT,
 	CMD_LOGOUT,
+	CMD_LOGOUT_RESULT,
 	CMD_ERROR
 };
 //包头 描述消息包的大小，描述数据的作用
@@ -23,19 +25,39 @@ struct DataHeader {
 	short _cmd;
 };
 //包体 存放数据
-struct Login {
+struct Login :public DataHeader
+{
+	Login() {
+		_dataLength = sizeof(Login);
+		_cmd = CMD_LOGIN;
+	}
 	char _userName[32];
 	char _password[32];
 };
-struct LoginResult {
+struct LoginResult :public DataHeader
+{
+	LoginResult() {
+		_dataLength = sizeof(LoginResult);
+		_cmd = CMD_LOGIN_RESULT;
+		_result = 1;
+	}
 	int _result;
 };
-struct Logout
+struct Logout :public DataHeader
 {
+	Logout() {
+		_dataLength = sizeof(Logout);
+		_cmd = CMD_LOGOUT;
+	}
 	char _userName[32];
 };
-struct LogoutResult
+struct LogoutResult :public DataHeader
 {
+	LogoutResult() {
+		_dataLength = sizeof(LogoutResult);
+		_cmd = CMD_LOGOUT_RESULT;
+		_result = 1;
+	}
 	int _result;
 };
 
@@ -91,22 +113,26 @@ int main() {
 			std::cout << "客户端已退出，任务结束" << std::endl;
 			break;
 		}
-		std::cout << "收到客户端命令：" << header._cmd <<" 数据长度："<<header._dataLength << std::endl;
+
 		// 6 向客户端发送响应 
 		switch (header._cmd)
 		{
 		case CMD_LOGIN: {
 			Login login = {};
-			recv(cSock, (char*)&login, sizeof(login), 0);
-			LoginResult ret = { 1 };
-			send(cSock, (char*)&header, sizeof(DataHeader), 0);
+			recv(cSock, (char*)&login+sizeof(DataHeader), sizeof(Login)-sizeof(DataHeader), 0);
+			std::cout << "收到命令：CMD_LOGIN" << " 数据长度：" << login._dataLength 
+				<< " 用户名：" << login._userName << " 密码：" << login._password << std::endl;
+
+			LoginResult ret;
 			send(cSock, (char*)&ret, sizeof(LoginResult), 0);
+
 		}break;
 		case CMD_LOGOUT: {
 			Logout logout = {};
-			recv(cSock, (char*)&logout, sizeof(Logout), 0);
-			LogoutResult ret = { 1 };
-			send(cSock, (char*)&header, sizeof(DataHeader), 0);
+			recv(cSock, (char*)&logout+sizeof(DataHeader), sizeof(Logout)-sizeof(DataHeader), 0);
+			std::cout << "收到命令：CMD_LOGOUT" << " 数据长度：" << logout._dataLength
+				<< " 用户名：" << logout._userName << std::endl;
+			LogoutResult ret;
 			send(cSock, (char*)&ret, sizeof(LogoutResult), 0);
 		}break;
 		default:
