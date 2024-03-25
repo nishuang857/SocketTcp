@@ -99,7 +99,7 @@ public:
 			_sock = INVALID_SOCKET;
 		}
 	}
-
+	int nCount = 0;
 	//处理网络消息
 	bool OnRun()
 	{
@@ -168,7 +168,7 @@ public:
 			//这时就可以知道当前消息长度
 			DataHeader* header = (DataHeader*)_szMsgBuf;
 			////判断消息缓冲区的数据长度大于消息长度  
-			if (_lastPos > header->dataLength)
+			if (_lastPos >= header->dataLength)
 			{
 				//剩余未处理消息缓冲区数据的长度
 				int nSize = _lastPos - header->dataLength;
@@ -185,9 +185,6 @@ public:
 				break;
 			}
 		}
-
-		//recv(cSock, szRecv + sizeof(DataHeader), header->dataLength - sizeof(DataHeader), 0);
-		//OnNetMsg(header);
 		return 0;
 	}
 
@@ -216,21 +213,21 @@ public:
 		}
 		break;
 		case CMD_ERROR:
-			//printf("<socket=%d>收到服务端消息：CMD_ERROR,数据长度：%d\n", _sock, header->dataLength);
+			printf("<socket=%d>收到服务端消息：CMD_ERROR,数据长度：%d\n", _sock, header->dataLength);
 			break;
 		default:
 		{
-			//printf("<socket=%d>收到未定义消息,数据长度：%d\n", _sock, header->dataLength);
+			printf("<socket=%d>收到未定义消息,数据长度：%d\n", _sock, header->dataLength);
 		}
 		}
 	}
 
 	//发送数据
-	int SendData(DataHeader* header)
+	int SendData(DataHeader* header,int nLen)
 	{
 		if (isRun() && header)
 		{
-			return send(_sock, (const char*)header, header->dataLength, 0);
+			return send(_sock, (const char*)header, nLen, 0);
 		}
 		return SOCKET_ERROR;
 	}
