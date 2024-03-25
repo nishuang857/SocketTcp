@@ -1,5 +1,5 @@
-#ifndef _EasyTcpClient_hpp_
-#define _EasyTcpClient_hpp_
+#ifndef _TcpClient_hpp_
+#define _TcpClient_hpp_
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -52,7 +52,7 @@ public:
 			printf("错误，建立Socket失败...\n");
 		}
 		else {
-			printf("建立Socket=<%d>成功...\n", _sock);
+			//printf("建立Socket=<%d>成功...\n", _sock);
 		}
 	}
 
@@ -72,14 +72,14 @@ public:
 #else
 		_sin.sin_addr.s_addr = inet_addr(ip);
 #endif
-		printf("<socket=%d>正在连接服务器<%s:%d>...\n", _sock, ip, port);
+		//printf("<socket=%d>正在连接服务器<%s:%d>...\n", _sock, ip, port);
 		int ret = connect(_sock, (sockaddr*)&_sin, sizeof(sockaddr_in));
 		if (SOCKET_ERROR == ret)
 		{
 			printf("<socket=%d>错误，连接服务器<%s:%d>失败...\n", _sock, ip, port);
 		}
 		else {
-			printf("<socket=%d>连接服务器<%s:%d>成功...\n", _sock, ip, port);
+			//printf("<socket=%d>连接服务器<%s:%d>成功...\n", _sock, ip, port);
 		}
 		return ret;
 	}
@@ -137,28 +137,62 @@ public:
 	{
 		return _sock != INVALID_SOCKET;
 	}
-
+	//缓冲区最小单元大小
+#ifndef RECV_BUFF_SIZE
+#define RECV_BUFF_SIZE 10240
+#endif // RECV_BUFF_SIZE
+	//接收缓冲区
+	char _szRecv[RECV_BUFF_SIZE] = {};
+	//第二缓冲区 消息缓冲区
+	char _szMsgBuf[RECV_BUFF_SIZE * 10] = {};
+	//第二缓冲区数据尾部位置
+	int _lastPos = 0;
 	//接收数据 处理粘包 拆分包
-	int RecvData(SOCKET _cSock)
+	int RecvData(SOCKET cSock)
 	{
 		//缓冲区
-		char szRecv[4096] = {};
-		// 5 接收客户端数据
-		int nLen = (int)recv(_cSock, szRecv, sizeof(DataHeader), 0);
-		DataHeader* header = (DataHeader*)szRecv;
+		// 5 接收服务端数据
+		int nLen = (int)recv(cSock, _szRecv, RECV_BUFF_SIZE, 0);
 		if (nLen <= 0)
 		{
-			printf("<socket=%d>与服务器断开连接，任务结束。\n", _cSock);
+			printf("<socket=%d>与服务器断开连接，任务结束。\n", cSock);
 			return -1;
 		}
-		recv(_cSock, szRecv + sizeof(DataHeader), header->dataLength - sizeof(DataHeader), 0);
+		//将收到的数据拷贝到消息缓冲区
+		memcpy(_szMsgBuf + _lastPos, _szRecv, nLen);
+		//消息缓冲区的数据尾部位置后移
+		_lastPos += nLen;
+		//判断消息缓冲区的数据长度大于消息头长度  
+		while (_lastPos >= sizeof(DataHeader))
+		{
+			//这时就可以知道当前消息长度
+			DataHeader* header = (DataHeader*)_szMsgBuf;
+			////判断消息缓冲区的数据长度大于消息长度  
+			if (_lastPos > header->dataLength)
+			{
+				//剩余未处理消息缓冲区数据的长度
+				int nSize = _lastPos - header->dataLength;
+				//处理网络消息
+				OnNetMsg(header);
+				//将消息缓冲区未处理数据前移
+				memcpy(_szMsgBuf, _szMsgBuf + header->dataLength, nSize);
+				//消息缓冲区的数去尾部位置前移
+				_lastPos = nSize;
+			}
+			else
+			{
+				//消息缓冲区剩余数据不够一条完整消息
+				break;
+			}
+		}
 
-		OnNetMsg(header);
+		//recv(cSock, szRecv + sizeof(DataHeader), header->dataLength - sizeof(DataHeader), 0);
+		//OnNetMsg(header);
 		return 0;
 	}
 
 	//响应网络消息
-	void OnNetMsg(DataHeader* header)
+	virtual void OnNetMsg(DataHeader* header)
 	{
 		switch (header->cmd)
 		{
@@ -166,21 +200,28 @@ public:
 		{
 
 			LoginResult* login = (LoginResult*)header;
-			printf("<socket=%d>收到服务端消息：CMD_LOGIN_RESULT,数据长度：%d\n", _sock, login->dataLength);
+			//printf("<socket=%d>收到服务端消息：CMD_LOGIN_RESULT,数据长度：%d\n", _sock, login->dataLength);
 		}
 		break;
 		case CMD_LOGOUT_RESULT:
 		{
 			LogoutResult* logout = (LogoutResult*)header;
-			printf("<socket=%d>收到服务端消息：CMD_LOGOUT_RESULT,数据长度：%d\n", _sock, logout->dataLength);
+			//printf("<socket=%d>收到服务端消息：CMD_LOGOUT_RESULT,数据长度：%d\n", _sock, logout->dataLength);
 		}
 		break;
 		case CMD_NEW_USER_JOIN:
 		{
 			NewUserJoin* userJoin = (NewUserJoin*)header;
-			printf("<socket=%d>收到服务端消息：CMD_NEW_USER_JOIN,数据长度：%d\n", _sock, userJoin->dataLength);
+			//printf("<socket=%d>收到服务端消息：CMD_NEW_USER_JOIN,数据长度：%d\n", _sock, userJoin->dataLength);
 		}
 		break;
+		case CMD_ERROR:
+			//printf("<socket=%d>收到服务端消息：CMD_ERROR,数据长度：%d\n", _sock, header->dataLength);
+			break;
+		default:
+		{
+			//printf("<socket=%d>收到未定义消息,数据长度：%d\n", _sock, header->dataLength);
+		}
 		}
 	}
 
